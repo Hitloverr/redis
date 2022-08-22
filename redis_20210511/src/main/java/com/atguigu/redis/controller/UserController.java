@@ -23,6 +23,7 @@ import java.util.Random;
 @Api(description = "用户User接口")
 @RestController
 @Slf4j
+// 前端--》controller【userDto】 --》 service【user】
 public class UserController
 {
     @Resource

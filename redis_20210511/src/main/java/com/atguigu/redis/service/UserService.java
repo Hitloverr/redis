@@ -22,9 +22,10 @@ import java.util.concurrent.TimeUnit;
 @Service
 @Slf4j
 public class UserService {
-
+   // user:${userId}
     public static final String CACHE_KEY_USER = "user:";
 
+    // 双数据源~
     @Resource
     private UserMapper userMapper;
     @Resource
@@ -32,12 +33,14 @@ public class UserService {
 
     public void addUser(User user)
     {
-        //1 先插入mysql并成功
+        //1 先插入mysql并成功。null的属性不会保存。
         int i = userMapper.insertSelective(user);
 
+        // 数据库操作成功了~。
         if(i > 0)
         {
-            //2 需要再次查询一下mysql将数据捞回来并ok
+            //2 需要再次查询一下mysql将数据捞回来并ok【保证百分百数据插入成功】
+            // Mysql 和 redis一定要数据一致性，必须ok。更新也是~。
             user = userMapper.selectByPrimaryKey(user.getId());
             //3 将捞出来的user存进redis，完成新增功能的数据一致性。
             String key = CACHE_KEY_USER+user.getId();
@@ -47,6 +50,7 @@ public class UserService {
 
     public void deleteUser(Integer id)
     {
+        // 先更新数据库再删除缓存
         int i = userMapper.deleteByPrimaryKey(id);
 
         if(i > 0)
@@ -55,6 +59,7 @@ public class UserService {
             redisTemplate.delete(key);
         }
     }
+
 
     public void updateUser(User user)
     {
@@ -100,6 +105,7 @@ public class UserService {
 
 
     /**
+     * 实际过程redis的key应该都设置过期时间、热点key失效，会发现缓存击穿问题。
      * 加强补充，避免突然key实现了，打爆mysql，做一下预防，尽量不出现击穿的情况。
      * @param id
      * @return
@@ -118,6 +124,7 @@ public class UserService {
             synchronized (UserService.class){
                 user = (User) redisTemplate.opsForValue().get(key);
                 //3 二次查redis还是null，可以去查mysql了(mysql默认有数据)
+                // 避免被别人往缓存里面set了user。
                 if (user == null) {
                     //4 查询mysql拿数据
                     user = userMapper.selectByPrimaryKey(id);//mysql有数据默认
